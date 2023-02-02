@@ -50,7 +50,7 @@ contract MultiSigWallet{
         _;
     }
     modifier notExecuted(uint _txIndex){
-        require(!isConfirmed[_txIndex][msg.sender].executed,"tx does not exist");
+        require(!transactions[_txIndex].executed,"tx does not exist");
         _;
     }
     modifier notConfirm(uint _txIndex){
@@ -67,7 +67,7 @@ contract MultiSigWallet{
         for(uint i = 0 ;i < _owners.length ;i++){
             address owner = _owners[i];
 
-            require(owners[owner],"owner not unique");
+            require(owner!= address(0),"invalid owner");
             require(!isOwner[owner],"owner not unique");
 
             isOwner[owner] = true;
@@ -83,7 +83,7 @@ contract MultiSigWallet{
     function submitTransaction(address _to,uint _value,bytes memory _data) public onlyOwer{
         uint txIndex = transactions.length;
         transactions.push(
-            transaction({
+            Transaction({
                 to:_to,
                 value:_value,
                 data:_data,
@@ -112,8 +112,8 @@ contract MultiSigWallet{
             Transaction storage transaction = transactions[_txIndex];
             require(transaction.numberConfirmation >= numConfirmationRequired,"cannot execute tx");
             transaction.executed = true;
-            (bool success,) = transaction.to.call(value, transaction.value)(transaction.data);
-            require(success,"ts failed");
+            (bool success,) = transaction.to.call{value: transaction.value}(transaction.data);
+            require(success,"tx failed");
             emit ExecuteTransaction(msg.sender,_txIndex);
 
     }
@@ -127,5 +127,28 @@ contract MultiSigWallet{
          transaction.numberConfirmation -= 1;
          isConfirmed[_txIndex][msg.sender] = false;
          emit RevokeConfirmation(msg.sender,_txIndex);
+    }
+
+    function getOwners() public view returns(address[] memory){
+        return owners;
+    }
+    function getTransactionCount() public view returns(uint){
+        return transactions.length;
+    }
+    function getTransaction(uint _txIndex) public view returns(
+        address to,
+        uint value,
+        bytes memory data,
+        bool executed,
+        uint numConfirmations
+    ){
+        Transaction storage transaction = transactions[_txIndex];
+        return(
+            transaction.to,
+            transaction.value,
+            transaction.data,
+            transaction.executed,
+            transaction.numberConfirmation
+        );
     }
 }
